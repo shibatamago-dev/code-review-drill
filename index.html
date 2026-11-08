@@ -1,0 +1,515 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="claude:viewport-fit-sides" content="cover">
+<title>AIコード査読ドリル</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500&family=Zen+Kaku+Gothic+New:wght@400;500;700&display=swap">
+<style>
+:root {
+  /* Layout: one narrow review desk. Segmented progress on top, a diff-viewer style code pane in the middle, the verdict underneath. */
+  --bg: #EDF0F3;
+  --surface: #FFFFFF;
+  --ink: #16202A;
+  --muted: #566372;
+  --line: #D3DAE1;
+  --accent: #0B7A71;
+  --accent-ink: #FFFFFF;
+  --code-bg: #F5F7F9;
+  --code-hover: #DFF0ED;
+  --good: #0A6B43;
+  --good-bg: #D9F1E3;
+  --bad: #B42318;
+  --bad-bg: #FADFDB;
+  --font-ui: "Zen Kaku Gothic New", "Hiragino Kaku Gothic ProN", "Yu Gothic", Meiryo, sans-serif;
+  --font-code: "JetBrains Mono", ui-monospace, Menlo, Consolas, monospace;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #0D1218;
+    --surface: #151C24;
+    --ink: #E6EBF0;
+    --muted: #9AA7B4;
+    --line: #2B3541;
+    --accent: #3CC7B8;
+    --accent-ink: #06201D;
+    --code-bg: #0F151B;
+    --code-hover: #173A37;
+    --good: #47CD89;
+    --good-bg: #123626;
+    --bad: #F97066;
+    --bad-bg: #432220;
+    color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #0D1218;
+  --surface: #151C24;
+  --ink: #E6EBF0;
+  --muted: #9AA7B4;
+  --line: #2B3541;
+  --accent: #3CC7B8;
+  --accent-ink: #06201D;
+  --code-bg: #0F151B;
+  --code-hover: #173A37;
+  --good: #47CD89;
+  --good-bg: #123626;
+  --bad: #F97066;
+  --bad-bg: #432220;
+  color-scheme: dark;
+}
+* { box-sizing: border-box; }
+body {
+  background: var(--bg);
+  color: var(--ink);
+  font-family: var(--font-ui);
+  font-size: 16px;
+  line-height: 1.7;
+}
+.wrap {
+  max-width: 760px;
+  margin: 0 auto;
+  padding-inline: max(16px, env(safe-area-inset-left, 0px)) max(16px, env(safe-area-inset-right, 0px));
+  padding-block: 28px 56px;
+}
+.kicker { margin: 0; font-size: 13px; letter-spacing: .08em; color: var(--muted); }
+h1 { margin: 4px 0 10px; font-size: clamp(28px, 6vw, 38px); line-height: 1.25; font-weight: 700; text-wrap: balance; }
+.lede { margin: 0 0 22px; color: var(--muted); max-width: 40em; }
+
+.progress { display: grid; grid-template-columns: repeat(10, 1fr); gap: 4px; margin-bottom: 14px; }
+.seg { height: 6px; border-radius: 3px; background: var(--line); }
+.seg.cur { background: var(--accent); }
+.seg.ok { background: var(--good); }
+.seg.ng { background: var(--bad); }
+
+.card { background: var(--surface); border: 1px solid var(--line); border-radius: 10px; padding: 18px; display: grid; grid-template-columns: minmax(0, 1fr); gap: 14px; }
+.card > * { min-width: 0; }
+.qhead { display: flex; justify-content: space-between; align-items: baseline; gap: 12px; flex-wrap: wrap; }
+.qno { font-weight: 700; font-size: 18px; }
+.qscore { color: var(--muted); font-size: 14px; font-variant-numeric: tabular-nums; }
+.ask { margin: 0; font-size: 14px; color: var(--muted); }
+.ask b { color: var(--ink); font-weight: 700; }
+
+.code { border: 1px solid var(--line); border-radius: 8px; background: var(--code-bg); overflow-x: auto; padding-block: 6px; }
+.code { --chipcol: 0px; }
+.code.answered { --chipcol: 3.6em; }
+.line { display: grid; grid-template-columns: 3em var(--chipcol) minmax(max-content, 1fr); width: 100%; min-width: max-content; margin: 0; padding: 0; border: 0; background: transparent; color: var(--ink); font: inherit; text-align: left; font-family: var(--font-code); font-size: 14px; line-height: 1.75; }
+button.line { cursor: pointer; }
+button.line:hover:not(:disabled), button.line:focus-visible { background: var(--code-hover); outline: none; }
+button.line:focus-visible { box-shadow: inset 0 0 0 2px var(--accent); }
+button.line:disabled { cursor: default; color: var(--ink); }
+.line .no { text-align: right; padding-right: 12px; color: var(--muted); user-select: none; font-variant-numeric: tabular-nums; }
+.line .src { white-space: pre; padding-right: 14px; }
+.line.is-bug { background: var(--good-bg); }
+.line.is-wrong { background: var(--bad-bg); }
+.chipcell { display: flex; align-items: center; }
+.chip { font-family: var(--font-ui); font-size: 12px; font-weight: 700; padding: 0 8px; border-radius: 999px; line-height: 20px; display: inline-block; }
+.is-bug .chip { background: var(--good); color: var(--surface); }
+.is-wrong .chip { background: var(--bad); color: var(--surface); }
+
+.actions { display: flex; gap: 10px; flex-wrap: wrap; align-items: center; }
+.hint { margin: 0; color: var(--muted); font-size: 14px; }
+.btn { font: inherit; font-weight: 700; font-size: 15px; padding: 10px 18px; border-radius: 8px; border: 1px solid var(--line); background: var(--surface); color: var(--ink); cursor: pointer; }
+.btn:hover { border-color: var(--accent); }
+.btn:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.btn.primary { background: var(--accent); border-color: var(--accent); color: var(--accent-ink); }
+
+.verdict { display: grid; gap: 10px; padding-top: 14px; border-top: 1px solid var(--line); }
+.verdict h2 { margin: 0; font-size: 20px; line-height: 1.4; }
+.verdict h2.ok { color: var(--good); }
+.verdict h2.ng { color: var(--bad); }
+.verdict dl { margin: 0; display: grid; gap: 10px; }
+.verdict dt { font-size: 13px; font-weight: 700; color: var(--muted); letter-spacing: .04em; }
+.verdict dd { margin: 0; }
+.fix { margin: 0; padding: 10px 12px; background: var(--code-bg); border: 1px solid var(--line); border-radius: 8px; font-family: var(--font-code); font-size: 13.5px; line-height: 1.7; overflow-x: auto; white-space: pre; }
+
+.result { display: grid; gap: 14px; }
+.big { font-size: 44px; font-weight: 700; line-height: 1.1; font-variant-numeric: tabular-nums; }
+.big small { font-size: 20px; color: var(--muted); font-weight: 500; }
+.rows { list-style: none; margin: 0; padding: 0; display: grid; }
+.rows li { display: grid; grid-template-columns: 2.2em 1fr; gap: 8px; padding: 9px 0; border-top: 1px solid var(--line); min-width: 0; }
+.rows .mk { font-weight: 700; }
+.rows .mk.ok { color: var(--good); }
+.rows .mk.ng { color: var(--bad); }
+.rows .t { min-width: 0; }
+.rows .c { color: var(--muted); font-size: 13px; }
+.share { width: 100%; font: inherit; font-size: 14px; padding: 10px 12px; border: 1px solid var(--line); border-radius: 8px; background: var(--code-bg); color: var(--ink); }
+.foot { margin-top: 22px; color: var(--muted); font-size: 13px; }
+@media (prefers-reduced-motion: no-preference) {
+  .verdict { animation: rise .18s ease-out; }
+  @keyframes rise { from { opacity: 0; transform: translateY(4px); } to { opacity: 1; transform: none; } }
+}
+</style>
+<style>body{margin:0}[hidden]{display:none!important}</style>
+</head>
+<body>
+
+
+<main class="wrap">
+  <header>
+    <p class="kicker">Python / 全10問 / 約5分</p>
+    <h1>AIコード査読ドリル</h1>
+    <p class="lede">AIが書いたコードを、人が見抜けるかの練習です。怪しい行を選んでください。欠陥がないと思ったら「問題なし」を選びます。10問のうち、問題なしが1問含まれます。</p>
+  </header>
+  <p class="hint" id="best" hidden></p>
+  <div id="app"></div>
+  <p class="foot">試作版です。10問すべて、実際にPythonで動かして結果を確認しています。</p>
+</main>
+
+<script>
+// Analytics: paste the Cloudflare Web Analytics or GoatCounter snippet here when publishing.
+
+const P = [
+  {
+    cat: "存在しないAPI",
+    title: "group_by は pandas にない",
+    ask: "CSVを読み込んで、チームごとの売上合計を出して",
+    code: `import pandas as pd
+
+df = pd.read_csv("sales.csv")
+totals = df.group_by("team")["amount"].sum()
+print(totals)`,
+    bug: [3],
+    why: "pandas のメソッド名は groupby で、アンダースコアは入りません。group_by は別のライブラリ(Polars)の名前で、AIが別々のライブラリの名前を混ぜることがあります。",
+    impact: "実行すると AttributeError で止まります。動かせば気づける欠陥なので、まだ軽い部類です。",
+    fix: `totals = df.groupby("team")["amount"].sum()`
+  },
+  {
+    cat: "境界条件",
+    title: "最後の窓が1つ足りない",
+    ask: "リストの移動平均を計算する関数を作って",
+    code: `def moving_average(values, window):
+    result = []
+    for i in range(len(values) - window):
+        result.append(sum(values[i:i + window]) / window)
+    return result`,
+    bug: [2],
+    why: "要素数が n、窓の幅が w のとき、窓の数は n - w + 1 個です。range(len(values) - window) だと、最後の窓が1つ抜けます。",
+    impact: "[1, 2, 3, 4, 5] と幅3で、本来は [2.0, 3.0, 4.0] のところが [2.0, 3.0] になります。エラーは出ず、結果が1つ少ないだけなので気づきにくい欠陥です。",
+    fix: `for i in range(len(values) - window + 1):`
+  },
+  {
+    cat: "エラーの握りつぶし",
+    title: "例外を黙って空の設定にする",
+    ask: "JSONの設定ファイルを読み込む関数を作って",
+    code: `import json
+
+def load_config(path):
+    try:
+        with open(path) as f:
+            return json.load(f)
+    except Exception:
+        return {}`,
+    bug: [6, 7],
+    why: "ファイルが存在しない、JSONが壊れている、権限がない、といった失敗をすべて受け止めて、空の設定を返しています。",
+    impact: "呼び出し側は失敗に気づかず、設定が空のまま動き続けます。原因の分からない不具合として、あとで見つかります。",
+    fix: `def load_config(path):
+    with open(path) as f:
+        return json.load(f)  # 失敗は呼び出し側に伝える`
+  },
+  {
+    cat: "共有されるデフォルト値",
+    title: "リストのデフォルト引数",
+    ask: "タグをリストに追加する関数を作って",
+    code: `def add_tag(tag, tags=[]):
+    tags.append(tag)
+    return tags
+
+a = add_tag("python")
+b = add_tag("ai")
+print(b)`,
+    bug: [0],
+    why: "デフォルト引数のリストは、関数の定義時に1回だけ作られ、呼び出しをまたいで同じものが使われます。",
+    impact: "b は ['ai'] を期待しますが、実際は ['python', 'ai'] になります。a と b が同じリストを指しています。",
+    fix: `def add_tag(tag, tags=None):
+    if tags is None:
+        tags = []
+    tags.append(tag)
+    return tags`
+  },
+  {
+    cat: "SQLインジェクション",
+    title: "文字列でSQLを組み立てている",
+    ask: "名前でユーザーを検索する関数を作って",
+    code: `def find_user(conn, name):
+    query = f"SELECT * FROM users WHERE name = '{name}'"
+    return conn.execute(query).fetchall()`,
+    bug: [1],
+    why: "入力値を文字列としてSQLに埋め込んでいます。入力に SQL の断片が含まれていると、それが命令として実行されます。",
+    impact: "name に x' OR '1'='1 を渡すと、WHERE 句が常に真になり、全ユーザーの行が返ります。",
+    fix: `return conn.execute(
+    "SELECT * FROM users WHERE name = ?", (name,)
+).fetchall()`
+  },
+  {
+    cat: "浮動小数点の比較",
+    title: "小数の合計を == で比べている",
+    ask: "支払いの合計が代金と一致しているか判定して",
+    code: `def is_paid_in_full(price, payments):
+    return sum(payments) == price
+
+print(is_paid_in_full(0.3, [0.1, 0.2]))`,
+    bug: [1],
+    why: "0.1 + 0.2 は、2進数の浮動小数点では 0.30000000000000004 になり、0.3 と等しくなりません。",
+    impact: "0.1円と0.2円で0.3円を支払っても False になります。金額は、整数(円や銭単位)か Decimal で扱います。",
+    fix: `from decimal import Decimal
+return sum(payments, Decimal("0")) == price`
+  },
+  {
+    cat: "問題なし",
+    title: "欠陥のない正しいコード",
+    ask: "リストを指定した大きさのかたまりに分割する関数を作って",
+    code: `def chunk(items, size):
+    if size <= 0:
+        raise ValueError("size must be positive")
+    return [items[i:i + size] for i in range(0, len(items), size)]`,
+    bug: [],
+    why: "size が0以下のときは例外にして、無限ループや空振りを防いでいます。range の刻みで、最後の端数も1つのかたまりになります。",
+    impact: "chunk([1, 2, 3, 4, 5], 2) は [[1, 2], [3, 4], [5]]、空リストは [] を返します。",
+    fix: `# 修正は不要です`
+  },
+  {
+    cat: "比較演算子の誤用",
+    title: "文字列を is で比べている",
+    ask: "ユーザーが管理者かどうかを判定して",
+    code: `def is_admin(role):
+    if role is "admin":
+        return True
+    return False`,
+    bug: [1],
+    why: "is は「同じオブジェクトか」を調べる演算子で、値が等しいかを調べるのは == です。文字列リテラルとの is は、たまたま動くことがあるので見落としやすい書き方です。",
+    impact: "DBや文字列の結合から得た \"admin\" は別のオブジェクトなので False になり、管理者が管理者と判定されません。権限の判定でこれが起きると影響が大きくなります。",
+    fix: `if role == "admin":`
+  },
+  {
+    cat: "ループ中の変更",
+    title: "反復中のリストから要素を削除",
+    ask: "リストから負の数を取り除く関数を作って",
+    code: `def remove_negatives(nums):
+    for n in nums:
+        if n < 0:
+            nums.remove(n)
+    return nums`,
+    bug: [1, 3],
+    why: "反復している最中のリストから要素を削除すると、削除した位置以降がずれ、次の要素が飛ばされます。",
+    impact: "[-1, -2, 3] を渡すと、[3] ではなく [-2, 3] が返ります。連続する負の数が残ります。",
+    fix: `return [n for n in nums if n >= 0]`
+  },
+  {
+    cat: "データ漏洩",
+    title: "分割の前に標準化している",
+    ask: "ロジスティック回帰で分類して、標準化も入れて",
+    code: `from sklearn.preprocessing import StandardScaler
+from sklearn.model_selection import train_test_split
+from sklearn.linear_model import LogisticRegression
+
+scaler = StandardScaler()
+X_scaled = scaler.fit_transform(X)
+X_train, X_test, y_train, y_test = train_test_split(X_scaled, y, test_size=0.2, random_state=0)
+model = LogisticRegression().fit(X_train, y_train)
+print(model.score(X_test, y_test))`,
+    bug: [5],
+    why: "分割の前に、全データで平均と分散を求めています。テストデータの情報が、学習側の前処理に混ざります。",
+    impact: "エラーは出ず、テストのスコアが実力より良く見えます。本番で精度が落ちて初めて気づく、見つけにくい欠陥です。",
+    fix: `X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=0)
+scaler = StandardScaler().fit(X_train)
+X_train, X_test = scaler.transform(X_train), scaler.transform(X_test)`
+  }
+].map(p => ({ ...p, lines: p.code.split("\n") }));
+
+// 直し方が複数ある問題の別解(index は P と同じ順)
+const ALT = [
+  null,
+  { note: "内包表記で書いても同じ結果になります。窓の数は n - w + 1 個、という点は変わりません。",
+    code: `[sum(values[i:i + window]) / window for i in range(len(values) - window + 1)]` },
+  { note: "ファイルが無いときに既定値で続行するのが仕様なら、その例外だけを捕まえます。JSONが壊れている場合は、そのまま例外として伝わります。",
+    code: `except FileNotFoundError:
+    return {}` },
+  { note: "呼び出し側で add_tag(\"ai\", []) と毎回新しいリストを渡す方法もありますが、渡し忘れると再発します。引数を変更せず、新しいリストを返す形にする方法もあります。",
+    code: `def add_tag(tag, tags=()):
+    return [*tags, tag]` },
+  { note: "名前付きプレースホルダでも同じ効果があります。どの書き方でも、値を文字列として埋め込まないことが共通点です。",
+    code: `conn.execute("SELECT * FROM users WHERE name = :name", {"name": name})` },
+  { note: "浮動小数点のまま許容誤差で比べる方法もあります。ただし金額は、整数(円や銭単位)かDecimalで持つほうが安全です。",
+    code: `import math
+math.isclose(sum(payments), price)` },
+  null,
+  { note: "ロールを文字列ではなく列挙型(Enum)で持てば、typoや比較の書き方の誤りも減らせます。" },
+  { note: "コピーを反復する方法もあります。元のリストを書き換えたくない場合は、新しいリストを作る形が向いています。",
+    code: `for n in nums[:]:
+    if n < 0:
+        nums.remove(n)` },
+  { note: "前処理とモデルを Pipeline にまとめれば、分割・交差検証のたびに、学習側のデータだけで前処理が学習されます。",
+    code: `from sklearn.pipeline import make_pipeline
+model = make_pipeline(StandardScaler(), LogisticRegression())
+model.fit(X_train, y_train)  # X は分割前の生データ` }
+];
+P.forEach((p, k) => { p.alt = ALT[k]; });
+
+function getBest() {
+  try { const v = localStorage.getItem("drill-best"); return v === null ? null : Number(v); } catch (e) { return null; }
+}
+function setBest(s) {
+  try { const b = getBest(); if (b === null || s > b) localStorage.setItem("drill-best", String(s)); } catch (e) { /* 保存できない環境では何もしない */ }
+}
+
+const app = document.getElementById("app");
+const state = { i: 0, results: [], picked: null };
+
+function esc(s) {
+  return s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+}
+
+function progressHTML() {
+  let h = '<div class="progress" aria-hidden="true">';
+  for (let k = 0; k < P.length; k++) {
+    let c = "seg";
+    if (state.results[k]) c += state.results[k].ok ? " ok" : " ng";
+    else if (k === state.i) c += " cur";
+    h += '<span class="' + c + '"></span>';
+  }
+  return h + "</div>";
+}
+
+function scoreNow() {
+  return state.results.filter(r => r.ok).length;
+}
+
+function renderQuestion(answered) {
+  const p = P[state.i];
+  const pick = state.picked;
+  let lines = "";
+  p.lines.forEach((text, k) => {
+    const isBug = answered && p.bug.includes(k);
+    const isWrong = answered && pick === k && !p.bug.includes(k);
+    let cls = "line";
+    let chip = "";
+    if (isBug) { cls += " is-bug"; chip = '<span class="chip">欠陥</span>'; }
+    if (isWrong) { cls += " is-wrong"; chip = '<span class="chip">選択</span>'; }
+    const inner = '<span class="no">' + (k + 1) + '</span><span class="chipcell">' + chip + '</span><span class="src">' + esc(text) + '</span>';
+    if (text.trim() === "") {
+      lines += '<div class="' + cls + '">' + inner + '</div>';
+    } else {
+      lines += '<button type="button" class="' + cls + '" data-k="' + k + '"' + (answered ? " disabled" : "") + ' aria-label="' + (k + 1) + '行目を選ぶ">' + inner + '</button>';
+    }
+  });
+
+  let bottom = "";
+  if (!answered) {
+    bottom = '<div class="actions"><button type="button" class="btn" id="none">問題なし</button><p class="hint">怪しい行をタップ。なければ「問題なし」。</p></div>';
+  } else {
+    const r = state.results[state.i];
+    let head;
+    if (p.bug.length === 0) {
+      head = r.ok ? "正解。この問題に欠陥はありません" : "不正解。この問題に欠陥はありません";
+    } else if (r.ok) {
+      head = "正解。欠陥を見つけました";
+    } else if (pick === -1) {
+      head = "不正解。欠陥を見逃しました";
+    } else {
+      head = "不正解。欠陥は別の行です";
+    }
+    const last = state.i === P.length - 1;
+    bottom =
+      '<div class="verdict" tabindex="-1" id="verdict">' +
+      '<h2 class="' + (r.ok ? "ok" : "ng") + '">' + head + '</h2>' +
+      '<dl>' +
+      '<div><dt>種類</dt><dd>' + esc(p.cat) + '</dd></div>' +
+      '<div><dt>何が問題か</dt><dd>' + esc(p.why) + '</dd></div>' +
+      '<div><dt>実行するとどうなるか</dt><dd>' + esc(p.impact) + '</dd></div>' +
+      '<div><dt>直し方の例</dt><dd><pre class="fix">' + esc(p.fix) + '</pre></dd></div>' +
+      (p.alt ? '<div><dt>他の直し方</dt><dd>' + esc(p.alt.note) + (p.alt.code ? '<pre class="fix" style="margin-top:8px">' + esc(p.alt.code) + '</pre>' : '') + '</dd></div>' : '') +
+      '</dl>' +
+      '<div class="actions"><button type="button" class="btn primary" id="next">' + (last ? "結果を見る" : "次の問題へ") + '</button></div>' +
+      '</div>';
+  }
+
+  app.innerHTML =
+    progressHTML() +
+    '<section class="card">' +
+    '<div class="qhead"><span class="qno">問 ' + (state.i + 1) + ' / ' + P.length + '</span><span class="qscore">正解 ' + scoreNow() + ' / ' + state.results.length + '</span></div>' +
+    '<p class="ask"><b>AIへの依頼:</b> ' + esc(p.ask) + '</p>' +
+    '<div class="code' + (answered ? ' answered' : '') + '" role="group" aria-label="AIが書いたコード">' + lines + '</div>' +
+    bottom +
+    '</section>';
+
+  if (!answered) {
+    app.querySelectorAll("button.line").forEach(b => {
+      b.addEventListener("click", () => answer(Number(b.dataset.k)));
+    });
+    document.getElementById("none").addEventListener("click", () => answer(-1));
+  } else {
+    document.getElementById("next").addEventListener("click", next);
+    const v = document.getElementById("verdict");
+    if (v && v.scrollIntoView) v.scrollIntoView({ block: "nearest", behavior: "smooth" });
+  }
+}
+
+function answer(pick) {
+  const p = P[state.i];
+  const ok = p.bug.length === 0 ? pick === -1 : p.bug.includes(pick);
+  state.picked = pick;
+  state.results[state.i] = { ok: ok, pick: pick };
+  renderQuestion(true);
+}
+
+function next() {
+  if (state.i === P.length - 1) { renderResult(); return; }
+  state.i += 1;
+  state.picked = null;
+  renderQuestion(false);
+  window.scrollTo({ top: 0 });
+}
+
+function renderResult() {
+  const s = scoreNow();
+  setBest(s);
+  let msg;
+  if (s >= 9) msg = "AIの出力を、かなりの精度で見抜けています。";
+  else if (s >= 7) msg = "見抜ける欠陥が多い一方で、数か所の見落としがありました。";
+  else if (s >= 5) msg = "半分前後です。エラーが出ない欠陥ほど、見落としやすい傾向があります。";
+  else msg = "見抜きにくい欠陥が多い問題でした。解説を読み返して、もう一度試してみてください。";
+  const rows = P.map((p, k) => {
+    const r = state.results[k];
+    return '<li><span class="mk ' + (r.ok ? "ok" : "ng") + '">' + (r.ok ? "○" : "×") + '</span><span class="t">' + esc(p.title) + '<br><span class="c">' + (k + 1) + '問目 / ' + esc(p.cat) + '</span></span></li>';
+  }).join("");
+  const shareText = "AIコード査読ドリルで " + s + " / " + P.length + " でした。";
+  app.innerHTML =
+    progressHTML() +
+    '<section class="card result">' +
+    '<div class="big">' + s + '<small> / ' + P.length + '</small></div>' +
+    '<p style="margin:0">' + msg + '</p>' +
+    '<ul class="rows">' + rows + '</ul>' +
+    '<label class="hint" for="share">結果の文章(コピーして共有できます)</label>' +
+    '<input class="share" id="share" readonly value="' + esc(shareText) + '">' +
+    '<div class="actions"><button type="button" class="btn primary" id="again">もう一度解く</button><button type="button" class="btn" id="copy">結果をコピー</button><span class="hint" id="copied" hidden>コピーしました</span></div>' +
+    '</section>';
+  document.getElementById("again").addEventListener("click", () => {
+    state.i = 0; state.results = []; state.picked = null;
+    renderQuestion(false);
+    window.scrollTo({ top: 0 });
+  });
+  document.getElementById("copy").addEventListener("click", () => {
+    const inp = document.getElementById("share");
+    const done = () => { document.getElementById("copied").hidden = false; };
+    const fallback = () => { inp.focus(); inp.select(); };
+    try {
+      navigator.clipboard.writeText(shareText).then(done, fallback);
+    } catch (e) { fallback(); }
+  });
+  window.scrollTo({ top: 0 });
+}
+
+const bestNow = getBest();
+if (bestNow !== null) {
+  const bel = document.getElementById("best");
+  bel.textContent = "この端末での最高記録: " + bestNow + " / " + P.length;
+  bel.hidden = false;
+  bel.style.marginBottom = "12px";
+}
+renderQuestion(false);
+</script>
+
+</body>
+</html>
