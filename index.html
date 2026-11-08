@@ -94,7 +94,7 @@ h1 { margin: 4px 0 10px; font-size: clamp(28px, 6vw, 38px); line-height: 1.25; f
 .code { border: 1px solid var(--line); border-radius: 8px; background: var(--code-bg); overflow-x: auto; padding-block: 6px; }
 .code { --chipcol: 0px; }
 .code.answered { --chipcol: 3.6em; }
-.line { display: grid; grid-template-columns: 3em var(--chipcol) minmax(max-content, 1fr); width: 100%; min-width: max-content; margin: 0; padding: 0; border: 0; background: transparent; color: var(--ink); font: inherit; text-align: left; font-family: var(--font-code); font-size: 14px; line-height: 1.75; }
+.line { display: grid; grid-template-columns: 3em var(--chipcol) minmax(max-content, 1fr); width: 100%; min-width: max-content; margin: 0; padding: 0; border: 0; background: transparent; color: var(--ink); font: inherit; text-align: left; font-family: var(--font-code); font-size: 14px; line-height: 1.75; font-variant-ligatures: none; font-feature-settings: "liga" 0, "calt" 0; }
 button.line { cursor: pointer; }
 button.line:hover:not(:disabled), button.line:focus-visible { background: var(--code-hover); outline: none; }
 button.line:focus-visible { box-shadow: inset 0 0 0 2px var(--accent); }
@@ -122,7 +122,7 @@ button.line:disabled { cursor: default; color: var(--ink); }
 .verdict dl { margin: 0; display: grid; gap: 10px; }
 .verdict dt { font-size: 13px; font-weight: 700; color: var(--muted); letter-spacing: .04em; }
 .verdict dd { margin: 0; }
-.fix { margin: 0; padding: 10px 12px; background: var(--code-bg); border: 1px solid var(--line); border-radius: 8px; font-family: var(--font-code); font-size: 13.5px; line-height: 1.7; overflow-x: auto; white-space: pre; }
+.fix { margin: 0; padding: 10px 12px; background: var(--code-bg); border: 1px solid var(--line); border-radius: 8px; font-family: var(--font-code); font-size: 13.5px; line-height: 1.7; overflow-x: auto; white-space: pre; font-variant-ligatures: none; font-feature-settings: "liga" 0, "calt" 0; }
 
 .result { display: grid; gap: 14px; }
 .big { font-size: 44px; font-weight: 700; line-height: 1.1; font-variant-numeric: tabular-nums; }
