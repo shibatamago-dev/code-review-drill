@@ -142,6 +142,7 @@ button.line:disabled { cursor: default; color: var(--ink); }
 }
 </style>
 <style>body{margin:0}[hidden]{display:none!important}</style>
+<script data-goatcounter="https://shibatamago-dev.goatcounter.com/count" async src="//gc.zgo.at/count.js"></script>
 </head>
 <body>
 
@@ -158,7 +159,14 @@ button.line:disabled { cursor: default; color: var(--ink); }
 </main>
 
 <script>
-// Analytics: paste the Cloudflare Web Analytics or GoatCounter snippet here when publishing.
+// アクセス解析(GoatCounter)のイベント記録。スクリプトが読み込まれていない環境では何もしない。
+function track(name) {
+  try {
+    if (window.goatcounter && window.goatcounter.count) {
+      window.goatcounter.count({ path: name, title: name, event: true });
+    }
+  } catch (e) { /* 記録できなくても演習は続ける */ }
+}
 
 const P = [
   {
@@ -451,6 +459,7 @@ function answer(pick) {
   const ok = p.bug.length === 0 ? pick === -1 : p.bug.includes(pick);
   state.picked = pick;
   state.results[state.i] = { ok: ok, pick: pick };
+  track("q" + String(state.i + 1).padStart(2, "0") + (ok ? "-ok" : "-ng"));
   renderQuestion(true);
 }
 
@@ -465,6 +474,7 @@ function next() {
 function renderResult() {
   const s = scoreNow();
   setBest(s);
+  track("finish-" + String(s).padStart(2, "0"));
   let msg;
   if (s >= 9) msg = "AIの出力を、かなりの精度で見抜けています。";
   else if (s >= 7) msg = "見抜ける欠陥が多い一方で、数か所の見落としがありました。";
@@ -486,6 +496,7 @@ function renderResult() {
     '<div class="actions"><button type="button" class="btn primary" id="again">もう一度解く</button><button type="button" class="btn" id="copy">結果をコピー</button><span class="hint" id="copied" hidden>コピーしました</span></div>' +
     '</section>';
   document.getElementById("again").addEventListener("click", () => {
+    track("retry");
     state.i = 0; state.results = []; state.picked = null;
     renderQuestion(false);
     window.scrollTo({ top: 0 });
